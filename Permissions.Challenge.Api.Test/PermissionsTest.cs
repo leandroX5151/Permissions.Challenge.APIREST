@@ -13,6 +13,9 @@ namespace Permissions.Challenge.Api.Test
 {
     public class PermissionsTest
     {
+        private readonly int PERMISSION_ID = 1;
+        private readonly string PERMISSION_TYPE_DESCRIPTION = "Licencia";
+        private readonly int PERMISSION_TYPE_ID = 1;
 
         private IEnumerable<Permiso> GetTestData()
         {
@@ -23,7 +26,9 @@ namespace Permissions.Challenge.Api.Test
             var dataList = A.ListOf<Permiso>(10);
 
             TipoPermiso permissionType = new TipoPermiso();
-            permissionType.Descripcion = "Licencia";
+            dataList[0].Id = PERMISSION_ID;
+            permissionType.Id = PERMISSION_TYPE_ID;
+            permissionType.Descripcion = PERMISSION_TYPE_DESCRIPTION;
             dataList[0].TipoPermiso = permissionType;
 
             return dataList;
@@ -32,9 +37,7 @@ namespace Permissions.Challenge.Api.Test
         private Mock<IUnitOfWork> CreateIUnitOfWork()
         {
             //Configuración de instancia local de Entity Framework
-
             var dataTest = GetTestData().AsQueryable();
-
             var dbSet = new Mock<DbSet<Permiso>>();
             dbSet.As<IQueryable<Permiso>>().Setup(x => x.Provider).Returns(dataTest.Provider);
             dbSet.As<IQueryable<Permiso>>().Setup(x => x.Expression).Returns(dataTest.Expression);
@@ -43,6 +46,9 @@ namespace Permissions.Challenge.Api.Test
 
             dbSet.As<IAsyncEnumerable<Permiso>>().Setup(x => x.GetAsyncEnumerator(new System.Threading.CancellationToken()))
                 .Returns(new AsyncEnumerator<Permiso>(dataTest.GetEnumerator()));
+
+            // Configurar Provider, para poder realizar los filtros hacia la clase modelo "Permiso"
+            dbSet.As<IQueryable<Permiso>>().Setup(x => x.Provider).Returns(new AsyncQueryProvider<Permiso>(dataTest.Provider));
 
             var UoW = new Mock<IUnitOfWork>();
             UoW.Setup(x => x.Query<Permiso>()).Returns(dbSet.Object);
@@ -69,6 +75,38 @@ namespace Permissions.Challenge.Api.Test
 
             Assert.True(permissionDataAll.Any());
 
+        }
+
+        [Fact]
+        public void GetPermissionsByIdFound()
+        {
+            System.Diagnostics.Debugger.Launch();
+
+            var mockUoW = CreateIUnitOfWork();
+
+            PermisoDomain permisoDomain = new PermisoDomain(mockUoW.Object);
+
+            var permissionData = permisoDomain.GetById(PERMISSION_ID);
+
+            Assert.NotNull(permissionData);
+            Assert.NotNull(permissionData.TipoPermiso);
+            Assert.Equal(permissionData.Id, PERMISSION_ID);
+            Assert.Equal(permissionData.TipoPermiso.Id, PERMISSION_TYPE_ID);
+            Assert.Equal(permissionData.TipoPermiso.Descripcion, PERMISSION_TYPE_DESCRIPTION);
+        }
+
+        [Fact]
+        public void GetPermissionsByIdNotFound()
+        {
+            System.Diagnostics.Debugger.Launch();
+
+            var permissionIdIncorrect = 1000;
+
+            var mockUoW = CreateIUnitOfWork();
+
+            PermisoDomain permisoDomain = new PermisoDomain(mockUoW.Object);
+
+            Assert.Null(permisoDomain.GetById(permissionIdIncorrect));
         }
     }
 }
